@@ -1,1 +1,285 @@
-# DATA-621
+---
+title: "Untitled"
+author: "Sandra Dela Cruz"
+date: "2025-05-06"
+output: html_document
+---
+```{r, include=FALSE}
+# Load required packages
+library(dplyr)
+library(janitor)
+library(stringr)
+library(ggplot2)
+library(tidyr)
+library(purrr)
+library(DataExplorer)
+library(reshape2)
+library(pROC) # for ROC/AUC
+library(readr)
+library(caret) # for confusion matrix
+library(DHARMa)
+library(lares)
+library(mice)
+library(gridExtra)
+library(nnet) # for multinomial model
+library(car) # check for multicollinearity
+```
+
+# **Data Exploration**
+### **Initial Cleaning Before Splitting**
+1. Changed column names to snake format
+2. Add number column for row numbers before splitting to ensure no duplicate column is included in the evaluation data
+3. Assign class as target variable
+4. Rename index to gender
+5. Observe data types and detect missing values using summary, no missing values detected
+6. Correct variables data types
+
+```{r, echo=FALSE}
+library(readr)
+dataset_of_diabetes <- read_csv("C:/Users/artby/OneDrive/Desktop/DATA 621/projects/dataset_of_diabetes.csv")
+
+# 1. Changed column names to snake format
+# 2. Add number column for row numbers before splitting
+# 3. Assign class as target variable
+# "N" (No diabetes)
+# "P" (Possibly at risk for diabetes)
+# "Y" (Yes, diagnosed with diabetes)
+dataset_of_diabetes <- dataset_of_diabetes |>
+  mutate(number = row_number()) |>
+  clean_names(case = "snake") |>
+  rename(target = class, index = 3) |>
+  rename(gender = index) |>
+  select(id, no_pation, target, everything())
+
+# 5. Observe data types and detect missing values using summary, no missing values detected
+summary(dataset_of_diabetes)
+
+# 6. Correct variables data types
+dataset_of_diabetes <- dataset_of_diabetes |>
+  mutate(
+    gender = as.factor(gsub("^f$", "F", gender)),  # Replace lowercase 'f' with 'F'
+    target = factor(
+      target,
+      levels = c("N", "P", "Y")  # No need to make it ordered unless there's a natural order
+    )
+  )
+# Show corrected variables
+str(dataset_of_diabetes)
+
+plot_histogram(dataset_of_diabetes)
+plot_qq(dataset_of_diabetes)
+```
+
+### **Split Dataset into Training and Evaluation**
+1. Split original dataset into 8:2
+2. Check the distribution of split, output okay
+3. Identified overlapping number, none identified
+
+```{r, echo=FALSE}
+# using caret package
+set.seed(621)
+train_target <- createDataPartition(
+  dataset_of_diabetes$target, p = 0.8, list = FALSE)
+dataset_of_diabetes_training <- dataset_of_diabetes[train_target, ]
+dataset_of_diabetes_evaluation <- dataset_of_diabetes[-train_target, ]
+
+# check to ensure the distribution between the split
+ggplot(dataset_of_diabetes, aes(x = target, fill = "All")) +
+  geom_density(alpha = 0.3) +
+  geom_density(data = dataset_of_diabetes_training, aes(
+    x = target, fill = "Train"), alpha = 0.5) +
+  geom_density(data = dataset_of_diabetes_evaluation, aes(
+    x = target, fill = "Evaluation"), alpha = 0.5) +
+  labs(title = "Distribution of Target in Train vs Evaluation") +
+  theme_minimal()
+
+# Identify overlapping indices
+duplicates <- intersect(
+  dataset_of_diabetes_training$number, 
+  dataset_of_diabetes_evaluation$number)
+
+# Output how many duplicates and optionally which ones
+if(length(duplicates) > 0) {
+  cat("Found", length(duplicates), "duplicate no_pation:\n")
+  print(duplicates)
+} else {
+  cat("✅ No duplicate indices between training and evaluation sets.\n")
+}
+```
+
+### **Exploration of Both Datasets**
+1. Remove id, no_pation, and number columns because we don't need it
+2. Have an overview of both datasets
+3. Prior to splitting the datasets into training and evaluation we already performed missing value evaluation and we also corrected the datatypes, and we see that after splitting it did not distort the datatypes.
+```{r, echo=FALSE}
+# remove id, no_pation, and number columns
+dataset_of_diabetes_training <- dataset_of_diabetes_training |> 
+  select(-id, -no_pation, -number)
+str(dataset_of_diabetes_training)
+summary(dataset_of_diabetes_training)
+
+
+# do the same for evaluation data
+dataset_of_diabetes_evaluation <- dataset_of_diabetes_evaluation |>
+  select(-id, -no_pation, -number)
+str(dataset_of_diabetes_evaluation)
+summary(dataset_of_diabetes_evaluation)
+```
+
+### **Visual Correlation of Variables**
+1. To visualize correlations of variables, we use the `corr_cross()` function from the `lares` package, which allows for an easy comparison. This will potentially help us to include potential features when building our model. We set the method to Spearman since most of our data is not normally distributed (s-shaped as seen in our qq-plot).
+```{r, echo=FALSE, message=FALSE}
+#| fig-height: 5
+#| fig-width: 10
+
+corr_cross(dataset_of_diabetes_training, 
+           method = "spearman", max_pvalue = 0.05, top = 20)
+```
+
+# **Data Preparation**
+1. Drop vldl column because of potential data entry error, and create new column with vldl computed using tg. Vldl = tg/2.2
+2. Replace invalid or non-realistic values with NA
+Range:
+urea = 1-38.9 mg/dL
+cr = 26 - 400 umol/L
+hb_a1c = 3.7-14%
+chol = 3.0-10.3 mmol/L
+tg = keep values mmol/L
+hdl = 0.4-4.0 mmol/L
+ldl = 0.5-8.0 mm/L
+vldl = replace with tg/2.2
+bmi = keep
+
+```{r, echo=FALSE}
+# for training data
+dataset_of_diabetes_training <- dataset_of_diabetes_training |>
+  select(-vldl) |>  # Drop existing vldl column
+  mutate(
+    vldl = tg / 2.2,
+    urea = ifelse(urea < 1 | urea > 38.9, NA, urea),
+    cr = ifelse(cr < 26 | cr > 400, NA, cr),
+    hb_a1c = ifelse(hb_a1c < 3.7 | hb_a1c > 14, NA, hb_a1c),
+    chol = ifelse(chol < 3.0 | chol > 10.3, NA, chol),
+    hdl = ifelse(hdl < 0.4 | hdl > 4.0, NA, hdl),
+    ldl = ifelse(ldl < 0.5 | ldl > 8.0, NA, ldl)
+    # tg and bmi are kept as-is
+  )
+summary(dataset_of_diabetes_training)
+
+# for evaluation data
+dataset_of_diabetes_evaluation <- dataset_of_diabetes_evaluation |>
+  select(-vldl) |>  # Drop existing vldl column
+  mutate(
+    vldl = tg / 2.2,
+    urea = ifelse(urea < 1 | urea > 38.9, NA, urea),
+    cr = ifelse(cr < 26 | cr > 400, NA, cr),
+    hb_a1c = ifelse(hb_a1c < 3.7 | hb_a1c > 14, NA, hb_a1c),
+    chol = ifelse(chol < 3.0 | chol > 10.3, NA, chol),
+    hdl = ifelse(hdl < 0.4 | hdl > 4.0, NA, hdl),
+    ldl = ifelse(ldl < 0.5 | ldl > 8.0, NA, ldl)
+    # tg and bmi are kept as-is
+  )
+summary(dataset_of_diabetes_evaluation)
+```
+
+###**Imputation of Variables**
+```{r, echo=FALSE, message=FALSE}
+#| fig-height: 5
+#| fig-width: 10
+# mice imputation
+input_training = dataset_of_diabetes_training
+method_vector_train <- c("", "", "", "pmm", "pmm",
+                   "pmm", "pmm", "", "pmm", "pmm",
+                   "", ""
+                   )
+mice_imp_train = mice(input_training, m = 5, 
+                       method = method_vector_train)
+summary(input_training$cr)
+mice_imp_train$imp$cr
+clean_dataset_of_diabetes_training <- complete(mice_imp_train, 3)
+summary(clean_dataset_of_diabetes_training)
+plot_histogram(clean_dataset_of_diabetes_training)
+plot_qq(clean_dataset_of_diabetes_training)
+
+# do the same for evaluation data
+input_evaluation = dataset_of_diabetes_evaluation
+method_vector_eval <- c("", "", "", "pmm", "pmm",
+                   "pmm", "pmm", "", "pmm", "pmm",
+                   "", ""
+                   )
+mice_imp_eval = mice(input_evaluation, m = 5, 
+                       method = method_vector_eval)
+clean_dataset_of_diabetes_evaluation <- complete(mice_imp_eval, 3)
+summary(clean_dataset_of_diabetes_evaluation)
+plot_histogram(clean_dataset_of_diabetes_evaluation)
+plot_qq(clean_dataset_of_diabetes_evaluation)
+```
+
+# **Build Models**
+### Model 1
+```{r, echo=FALSE}
+# Fit model
+model1 <- multinom(target ~ gender + age + hb_a1c + bmi,
+                  data = clean_dataset_of_diabetes_training)
+
+summary(model1)
+
+# Calculate VIFs
+vif_values1 <- vif(model1)
+print(vif_values1)
+```
+
+# **Select Models**
+### Model 1 (Confusion Matrix, ROC curve, and AUC value)
+```{r, echo=FALSE}
+#| fig-height: 5
+#| fig-width: 10
+# Predict probabilities on the training data
+# Fit the multinomial logistic regression model
+model1 <- multinom(target ~ gender + age + hb_a1c + bmi,
+                   data = clean_dataset_of_diabetes_training)
+
+# Predict class probabilities
+prediction_prob_train1 <- predict(model1, clean_dataset_of_diabetes_training, type = "prob")
+
+# Predict most probable class
+prediction_class_train1 <- predict(model1, clean_dataset_of_diabetes_training, type = "class")
+
+# Confusion matrix
+conf_matrix_train1 <- confusionMatrix(
+  factor(prediction_class_train1, levels = c("N", "P", "Y")),
+  factor(clean_dataset_of_diabetes_training$target, levels = c("N", "P", "Y"))
+)
+print(conf_matrix_train1)
+
+# Accuracy
+accuracy1 <- mean(prediction_class_train1 == clean_dataset_of_diabetes_training$target)
+cat("Accuracy:", accuracy1, "\n")
+
+# Classification error
+classification_error_rate1 <- 1 - accuracy1
+cat("Classification Error Rate:", classification_error_rate1, "\n")
+
+# ROC and AUC (One-vs-Rest for each class)
+true_labels <- clean_dataset_of_diabetes_training$target
+classes <- colnames(prediction_prob_train1)
+
+# Plot setup
+par(mfrow = c(1, length(classes)))  # one ROC per class
+
+for (class in classes) {
+  # Create binary label: 1 if current class, else 0
+  binary_response <- ifelse(true_labels == class, 1, 0)
+  pred_probs <- prediction_prob_train1[, class]
+  
+  roc_curve <- roc(binary_response, pred_probs)
+  
+  # Plot
+  plot(roc_curve,
+       main = paste("ROC -", class, "\nAUC:", round(auc(roc_curve), 2)),
+       col = "red", lwd = 2)
+  
+  # Print AUC
+  cat("AUC for", class, ":", auc(roc_curve), "\n")
+}
+```
