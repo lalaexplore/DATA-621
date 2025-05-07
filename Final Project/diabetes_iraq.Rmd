@@ -36,7 +36,7 @@ library(car) # check for multicollinearity
 
 ```{r, echo=FALSE}
 library(readr)
-dataset_of_diabetes <- read_csv("")
+dataset_of_diabetes <- read_csv("https://raw.githubusercontent.com/lalaexplore/DATA-621/refs/heads/main/Final%20Project/dataset_of_diabetes.csv")
 
 # 1. Changed column names to snake format
 # 2. Add number column for row numbers before splitting
