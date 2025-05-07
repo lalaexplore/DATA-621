@@ -217,16 +217,98 @@ plot_qq(clean_dataset_of_diabetes_evaluation)
 
 # **Build Models**
 ### Model 1
-```{r, echo=FALSE}
-# Fit model
-model1 <- multinom(target ~ gender + age + hb_a1c + bmi,
-                  data = clean_dataset_of_diabetes_training)
+```{r, echo=FALSE, warning=FALSE}
 
+# Fit the multinomial logistic regression model
+model1 <- multinom(target ~ gender + hb_a1c + bmi:age + chol, 
+                   data = clean_dataset_of_diabetes_training)
+cat("Summary Model 1: \n")
 summary(model1)
 
-# Calculate VIFs
-vif_values1 <- vif(model1)
-print(vif_values1)
+# Get summary of the model (to extract coefficients and standard errors)
+summary_model1 <- summary(model1)
+
+# Compute z-scores and p-values
+z_scores1 <- summary_model1$coefficients / summary_model1$standard.errors
+p_values1 <- 2 * (1 - pnorm(abs(z_scores1)))
+
+# View the p-values
+cat("P-values Model 1: \n")
+print(p_values1)
+
+library(broom)
+tidy(model1)
+```
+
+### Model 2
+```{r, echo=FALSE, warning=FALSE}
+
+# Fit the multinomial logistic regression model
+model2 <- multinom(target ~ gender + hb_a1c + bmi:age + chol:tg, 
+                   data = clean_dataset_of_diabetes_training)
+cat("Summary Model 2: \n")
+summary(model2)
+
+# Get summary of the model (to extract coefficients and standard errors)
+summary_model2 <- summary(model2)
+
+# Compute z-scores and p-values
+z_scores2 <- summary_model2$coefficients / summary_model2$standard.errors
+p_values2 <- 2 * (1 - pnorm(abs(z_scores2)))
+
+# View the p-values
+cat("P-values Model 2: \n")
+print(p_values2)
+
+library(broom)
+tidy(model2)
+```
+### Model 3
+```{r, echo=FALSE, warning=FALSE}
+
+# Fit the multinomial logistic regression model
+model3 <- multinom(target ~ gender + hb_a1c + bmi:age + chol:ldl, 
+                   data = clean_dataset_of_diabetes_training)
+cat("Summary Model 3: \n")
+summary(model3)
+
+# Get summary of the model (to extract coefficients and standard errors)
+summary_model3 <- summary(model3)
+
+# Compute z-scores and p-values
+z_scores3 <- summary_model3$coefficients / summary_model3$standard.errors
+p_values3 <- 2 * (1 - pnorm(abs(z_scores3)))
+
+# View the p-values
+cat("P-values Model 3: \n")
+print(p_values3)
+
+library(broom)
+tidy(model3)
+```
+
+### Model 4
+```{r, echo=FALSE, warning=FALSE}
+
+# Fit the multinomial logistic regression model
+model4 <- multinom(target ~ gender + hb_a1c + bmi:age + chol:vldl + cr, 
+                   data = clean_dataset_of_diabetes_training)
+cat("Summary Model 4: \n")
+summary(model4)
+
+# Get summary of the model (to extract coefficients and standard errors)
+summary_model4 <- summary(model4)
+
+# Compute z-scores and p-values
+z_scores4 <- summary_model4$coefficients / summary_model4$standard.errors
+p_values4 <- 2 * (1 - pnorm(abs(z_scores4)))
+
+# View the p-values
+cat("P-values Model 4: \n")
+print(p_values4)
+
+library(broom)
+tidy(model4)
 ```
 
 # **Select Models**
