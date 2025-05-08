@@ -216,7 +216,7 @@ plot_qq(clean_dataset_of_diabetes_evaluation)
 ```
 
 # **Build Models**
-### Model 1
+### Model 1 - BEST OVERALL
 ```{r, echo=FALSE, warning=FALSE}
 
 # Fit the multinomial logistic regression model
@@ -235,6 +235,10 @@ p_values1 <- 2 * (1 - pnorm(abs(z_scores1)))
 # View the p-values
 cat("P-values Model 1: \n")
 print(p_values1)
+
+cat("Odds Ratio Model 1: \n")
+odds_ratios1 <- exp(coef(model1))
+print(odds_ratios1)
 
 library(broom)
 tidy(model1)
@@ -260,6 +264,10 @@ p_values2 <- 2 * (1 - pnorm(abs(z_scores2)))
 cat("P-values Model 2: \n")
 print(p_values2)
 
+cat("Odds Ratio Model 2: \n")
+odds_ratios2 <- exp(coef(model2))
+print(odds_ratios2)
+
 library(broom)
 tidy(model2)
 ```
@@ -282,6 +290,10 @@ p_values3 <- 2 * (1 - pnorm(abs(z_scores3)))
 # View the p-values
 cat("P-values Model 3: \n")
 print(p_values3)
+
+cat("Odds Ratio Model 3: \n")
+odds_ratios3 <- exp(coef(model3))
+print(odds_ratios3)
 
 library(broom)
 tidy(model3)
@@ -307,19 +319,19 @@ p_values4 <- 2 * (1 - pnorm(abs(z_scores4)))
 cat("P-values Model 4: \n")
 print(p_values4)
 
+cat("Odds Ratio Model 4: \n")
+odds_ratios4 <- exp(coef(model4))
+print(odds_ratios4)
+
 library(broom)
 tidy(model4)
 ```
 
 # **Select Models**
-### Model 1 (Confusion Matrix, ROC curve, and AUC value)
+### Model 1 (Confusion Matrix, ROC curve, and AUC value) - BEST OVERALL
 ```{r, echo=FALSE}
 #| fig-height: 5
 #| fig-width: 10
-# Predict probabilities on the training data
-# Fit the multinomial logistic regression model
-model1 <- multinom(target ~ gender + age + hb_a1c + bmi,
-                   data = clean_dataset_of_diabetes_training)
 
 # Predict class probabilities
 prediction_prob_train1 <- predict(model1, clean_dataset_of_diabetes_training, type = "prob")
@@ -340,6 +352,156 @@ cat("Accuracy:", accuracy1, "\n")
 
 # Classification error
 classification_error_rate1 <- 1 - accuracy1
+cat("Classification Error Rate:", classification_error_rate1, "\n")
+
+# ROC and AUC (One-vs-Rest for each class)
+true_labels <- clean_dataset_of_diabetes_training$target
+classes <- colnames(prediction_prob_train1)
+
+# Plot setup
+par(mfrow = c(1, length(classes)))  # one ROC per class
+
+for (class in classes) {
+  # Create binary label: 1 if current class, else 0
+  binary_response <- ifelse(true_labels == class, 1, 0)
+  pred_probs <- prediction_prob_train1[, class]
+  
+  roc_curve <- roc(binary_response, pred_probs)
+  
+  # Plot
+  plot(roc_curve,
+       main = paste("ROC -", class, "\nAUC:", round(auc(roc_curve), 2)),
+       col = "red", lwd = 2)
+  
+  # Print AUC
+  cat("AUC for", class, ":", auc(roc_curve), "\n")
+}
+```
+
+### Model 2
+```{r, echo=FALSE}
+#| fig-height: 5
+#| fig-width: 10
+
+# Predict class probabilities
+prediction_prob_train2 <- predict(model2, clean_dataset_of_diabetes_training, type = "prob")
+
+# Predict most probable class
+prediction_class_train2 <- predict(model2, clean_dataset_of_diabetes_training, type = "class")
+
+# Confusion matrix
+conf_matrix_train2 <- confusionMatrix(
+  factor(prediction_class_train1, levels = c("N", "P", "Y")),
+  factor(clean_dataset_of_diabetes_training$target, levels = c("N", "P", "Y"))
+)
+print(conf_matrix_train2)
+
+# Accuracy
+accuracy2 <- mean(prediction_class_train2 == clean_dataset_of_diabetes_training$target)
+cat("Accuracy:", accuracy2, "\n")
+
+# Classification error
+classification_error_rate2 <- 1 - accuracy2
+cat("Classification Error Rate:", classification_error_rate2, "\n")
+
+# ROC and AUC (One-vs-Rest for each class)
+true_labels <- clean_dataset_of_diabetes_training$target
+classes <- colnames(prediction_prob_train2)
+
+# Plot setup
+par(mfrow = c(1, length(classes)))  # one ROC per class
+
+for (class in classes) {
+  # Create binary label: 1 if current class, else 0
+  binary_response <- ifelse(true_labels == class, 1, 0)
+  pred_probs <- prediction_prob_train1[, class]
+  
+  roc_curve <- roc(binary_response, pred_probs)
+  
+  # Plot
+  plot(roc_curve,
+       main = paste("ROC -", class, "\nAUC:", round(auc(roc_curve), 2)),
+       col = "red", lwd = 2)
+  
+  # Print AUC
+  cat("AUC for", class, ":", auc(roc_curve), "\n")
+}
+```
+
+### Model 3
+```{r, echo=FALSE}
+#| fig-height: 5
+#| fig-width: 10
+
+# Predict class probabilities
+prediction_prob_train3 <- predict(model3, clean_dataset_of_diabetes_training, type = "prob")
+
+# Predict most probable class
+prediction_class_train3 <- predict(model3, clean_dataset_of_diabetes_training, type = "class")
+
+# Confusion matrix
+conf_matrix_train3 <- confusionMatrix(
+  factor(prediction_class_train3, levels = c("N", "P", "Y")),
+  factor(clean_dataset_of_diabetes_training$target, levels = c("N", "P", "Y"))
+)
+print(conf_matrix_train3)
+
+# Accuracy
+accuracy3 <- mean(prediction_class_train3 == clean_dataset_of_diabetes_training$target)
+cat("Accuracy:", accuracy3, "\n")
+
+# Classification error
+classification_error_rate3 <- 1 - accuracy3
+cat("Classification Error Rate:", classification_error_rate3, "\n")
+
+# ROC and AUC (One-vs-Rest for each class)
+true_labels <- clean_dataset_of_diabetes_training$target
+classes <- colnames(prediction_prob_train3)
+
+# Plot setup
+par(mfrow = c(1, length(classes)))  # one ROC per class
+
+for (class in classes) {
+  # Create binary label: 1 if current class, else 0
+  binary_response <- ifelse(true_labels == class, 1, 0)
+  pred_probs <- prediction_prob_train1[, class]
+  
+  roc_curve <- roc(binary_response, pred_probs)
+  
+  # Plot
+  plot(roc_curve,
+       main = paste("ROC -", class, "\nAUC:", round(auc(roc_curve), 2)),
+       col = "red", lwd = 2)
+  
+  # Print AUC
+  cat("AUC for", class, ":", auc(roc_curve), "\n")
+}
+```
+
+### Model 4
+```{r, echo=FALSE}
+#| fig-height: 5
+#| fig-width: 10
+
+# Predict class probabilities
+prediction_prob_train4 <- predict(model4, clean_dataset_of_diabetes_training, type = "prob")
+
+# Predict most probable class
+prediction_class_train4 <- predict(model4, clean_dataset_of_diabetes_training, type = "class")
+
+# Confusion matrix
+conf_matrix_train4 <- confusionMatrix(
+  factor(prediction_class_train1, levels = c("N", "P", "Y")),
+  factor(clean_dataset_of_diabetes_training$target, levels = c("N", "P", "Y"))
+)
+print(conf_matrix_train4)
+
+# Accuracy
+accuracy4 <- mean(prediction_class_train4 == clean_dataset_of_diabetes_training$target)
+cat("Accuracy:", accuracy4, "\n")
+
+# Classification error
+classification_error_rate4 <- 1 - accuracy4
 cat("Classification Error Rate:", classification_error_rate1, "\n")
 
 # ROC and AUC (One-vs-Rest for each class)
