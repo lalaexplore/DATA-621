@@ -531,9 +531,12 @@ for (class in classes) {
 # **Predictions on Evaluation Dataset**
 
 ```{r, echo=FALSE}
-# Predict on evaluation data
-prediction_prob_eval <- predict(model1, clean_dataset_of_diabetes_evaluation, type = "prob")
-prediction_class_eval <- predict(model1, clean_dataset_of_diabetes_evaluation, type = "class")
+# Drop the target column from the evaluation dataset before prediction
+eval_data_no_target <- clean_dataset_of_diabetes_evaluation[, setdiff(names(clean_dataset_of_diabetes_evaluation), "target")]
+
+# Predict on evaluation data (no target column)
+prediction_prob_eval <- predict(model1, eval_data_no_target, type = "prob")
+prediction_class_eval <- predict(model1, eval_data_no_target, type = "class")
 
 # Confusion Matrix
 conf_matrix_eval <- confusionMatrix(
@@ -563,4 +566,24 @@ for (class in classes_eval) {
   
   cat("AUC for", class, ":", auc(roc_curve_eval), "\n")
 }
+
+head(prediction_class_eval, 20)
 ```
+
+# **Comparison of Actual Target vs. Predicted Target From Using Model 1**
+
+```{r, echo=FALSE}
+# Create a comparison data frame
+comparison_df <- data.frame(
+  Actual = clean_dataset_of_diabetes_evaluation$target,
+  Predicted = prediction_class_eval
+)
+
+# View first few rows of the comparison
+head(comparison_df, 50)
+
+# Optional: View mismatches only
+mismatches <- comparison_df[comparison_df$Actual != comparison_df$Predicted, ]
+head(mismatches, 50)
+```
+
