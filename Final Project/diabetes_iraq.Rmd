@@ -213,10 +213,11 @@ clean_dataset_of_diabetes_evaluation <- complete_data[801:1000, ]
 # Plot histograms and QQ plots for the imputed data
 plot_histogram(clean_dataset_of_diabetes_training)
 plot_qq(clean_dataset_of_diabetes_training)
+summary(clean_dataset_of_diabetes_training)
 
 plot_histogram(clean_dataset_of_diabetes_evaluation)
 plot_qq(clean_dataset_of_diabetes_evaluation)
-
+summary(clean_dataset_of_diabetes_evaluation)
 ```
 
 # **Build Models**
