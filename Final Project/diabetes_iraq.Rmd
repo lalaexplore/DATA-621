@@ -527,3 +527,40 @@ for (class in classes) {
   cat("AUC for", class, ":", auc(roc_curve), "\n")
 }
 ```
+
+# **Predictions on Evaluation Dataset**
+
+```{r, echo=FALSE}
+# Predict on evaluation data
+prediction_prob_eval <- predict(model1, clean_dataset_of_diabetes_evaluation, type = "prob")
+prediction_class_eval <- predict(model1, clean_dataset_of_diabetes_evaluation, type = "class")
+
+# Confusion Matrix
+conf_matrix_eval <- confusionMatrix(
+  factor(prediction_class_eval, levels = c("N", "P", "Y")),
+  factor(clean_dataset_of_diabetes_evaluation$target, levels = c("N", "P", "Y"))
+)
+print(conf_matrix_eval)
+
+# Accuracy
+accuracy_eval <- mean(prediction_class_eval == clean_dataset_of_diabetes_evaluation$target)
+cat("Accuracy on Evaluation Data:", accuracy_eval, "\n")
+
+# ROC and AUC for each class
+true_labels_eval <- clean_dataset_of_diabetes_evaluation$target
+classes_eval <- colnames(prediction_prob_eval)
+
+par(mfrow = c(1, length(classes_eval)))  # one ROC per class
+for (class in classes_eval) {
+  binary_response_eval <- ifelse(true_labels_eval == class, 1, 0)
+  pred_probs_eval <- prediction_prob_eval[, class]
+  
+  roc_curve_eval <- roc(binary_response_eval, pred_probs_eval)
+  
+  plot(roc_curve_eval,
+       main = paste("ROC (Evaluation) -", class, "\nAUC:", round(auc(roc_curve_eval), 2)),
+       col = "blue", lwd = 2)
+  
+  cat("AUC for", class, ":", auc(roc_curve_eval), "\n")
+}
+```
