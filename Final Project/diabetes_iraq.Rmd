@@ -25,6 +25,8 @@ library(nnet) # for multinomial model
 library(car) # check for multicollinearity
 library(MLmetrics)
 library(randomForest)
+library(knitr)
+library(kableExtra)
 ```
 
 # **Data Exploration**
@@ -695,4 +697,79 @@ head(comparison_df, 50)
 # Optional: View mismatches only
 mismatches <- comparison_df[comparison_df$Actual != comparison_df$Predicted, ]
 head(mismatches, 50)
+```
+
+# **Comparing Models Performance**
+
+```{r}
+# Function to extract metrics from a model
+extract_metrics <- function(model, data, model_name, is_rf = FALSE) {
+  if (is_rf) {
+    pred_prob <- predict(model, data, type = "prob")
+    pred_class <- predict(model, data, type = "class")
+  } else {
+    pred_prob <- predict(model, data, type = "prob")
+    pred_class <- predict(model, data, type = "class")
+  }
+  
+  conf_matrix <- confusionMatrix(
+    factor(pred_class, levels = c("N", "P", "Y")),
+    factor(data$target, levels = c("N", "P", "Y"))
+  )
+  
+  metrics <- data.frame(
+    Model = model_name,
+    Accuracy = conf_matrix$overall["Accuracy"],
+    Kappa = conf_matrix$overall["Kappa"],
+    Sensitivity_N = conf_matrix$byClass["Class: N", "Sensitivity"],
+    Specificity_N = conf_matrix$byClass["Class: N", "Specificity"],
+    Sensitivity_P = conf_matrix$byClass["Class: P", "Sensitivity"],
+    Specificity_P = conf_matrix$byClass["Class: P", "Specificity"],
+    Sensitivity_Y = conf_matrix$byClass["Class: Y", "Sensitivity"],
+    Specificity_Y = conf_matrix$byClass["Class: Y", "Specificity"]
+  )
+  
+  # Calculate AUC for each class
+  true_labels <- data$target
+  classes <- if(is_rf) colnames(pred_prob) else colnames(pred_prob)
+  
+  for (class in classes) {
+    binary_response <- ifelse(true_labels == class, 1, 0)
+    pred_probs <- if(is_rf) pred_prob[, class] else pred_prob[, class]
+    roc_curve <- roc(binary_response, pred_probs)
+    metrics[[paste0("AUC_", class)]] <- auc(roc_curve)
+  }
+  
+  return(metrics)
+}
+
+# Create training metrics table
+training_metrics <- rbind(
+  extract_metrics(model1, clean_dataset_of_diabetes_training, "Model 1 (Multinomial)"),
+  extract_metrics(model2, clean_dataset_of_diabetes_training, "Model 2 (Multinomial)"),
+  extract_metrics(model3, clean_dataset_of_diabetes_training, "Model 3 (Multinomial)"),
+  extract_metrics(model4, clean_dataset_of_diabetes_training, "Model 4 (Multinomial)"),
+  extract_metrics(final_rfmodel, clean_dataset_of_diabetes_training, "Model 5 (Random Forest)", is_rf = TRUE)
+)
+
+# Create evaluation metrics table
+evaluation_metrics <- rbind(
+  extract_metrics(model1, clean_dataset_of_diabetes_evaluation, "Model 1 (Multinomial)"),
+  extract_metrics(model2, clean_dataset_of_diabetes_evaluation, "Model 2 (Multinomial)"),
+  extract_metrics(model3, clean_dataset_of_diabetes_evaluation, "Model 3 (Multinomial)"),
+  extract_metrics(model4, clean_dataset_of_diabetes_evaluation, "Model 4 (Multinomial)"),
+  extract_metrics(final_rfmodel, clean_dataset_of_diabetes_evaluation, "Model 5 (Random Forest)", is_rf = TRUE)
+)
+
+# Display the tables with better formatting
+
+cat("\n\n### Training Data Performance Metrics\n\n")
+kable(training_metrics, digits = 3, 
+      caption = "Model Performance on Training Data") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+cat("\n\n### Evaluation Data Performance Metrics\n\n")
+kable(evaluation_metrics, digits = 3, 
+      caption = "Model Performance on Evaluation Data") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
 ```
