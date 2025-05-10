@@ -131,7 +131,7 @@ summary(dataset_of_diabetes_evaluation)
 ```
 
 ### **Visual Correlation of Variables**
-1. To visualize correlations of variables, we use the `corr_cross()` function from the `lares` package, which allows for an easy comparison. This will potentially help us to include potential features when building our model. We set the method to Spearman since most of our data is not normally distributed (s-shaped as seen in our qq-plot).
+1. To visualize correlations of variables, we use the `corr_cross()` function from the `lares` package, which allows for an easy comparison. This will potentially help us to include potential features when building our model. We set the method to Spearman since most of our data is not normally distributed.
 ```{r, echo=FALSE, message=FALSE}
 #| fig-height: 5
 #| fig-width: 10
