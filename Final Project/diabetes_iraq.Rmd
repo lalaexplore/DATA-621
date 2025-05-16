@@ -719,7 +719,7 @@ However, the model's perfect sensitivity, specificity, and AUC of 1.0 for each c
 
 In contrast, the two multinomial logistic regression models, though more interpretable, performed poorly in detecting the Pre-diabetic class. Model 1 identified only 20 percent of these cases, and Model 2 failed to identify any. Both still showed high sensitivity for the Diabetic class and achieved respectable AUCs, but their inability to capture the intermediate class suggests a lack of complexity or flexibility in modeling non-linear relationships.
 
-Our workflow included important preprocessing decisions, such as cleaning and outlier removal prior to splitting, followed by combining datasets for imputation while masking the target. This approach avoided leakage and ensured consistent handling of missing values. Feature reduction in the Random Forest model also contributed to more stable performance by reducing redundancy.
+Our workflow included important preprocessing decisions, such as initially splitting the original dataset into training and evaluation, cleaning it separately by removing outliers, followed by combining datasets for imputation while masking the target. This approach avoided leakage and ensured consistent handling of missing values. Feature reduction in the Random Forest model also contributed to more stable performance by reducing redundancy.
 
 In summary, while the Random Forest model shows strong promise, its evaluation results are likely overly optimistic. Further testing on larger, more diverse datasets is necessary before considering real-world deployment.
 
