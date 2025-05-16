@@ -332,34 +332,32 @@ tidy(model2)
 ### Model 3 - Random Forest - BEST OVERALL
 
 ```{r, echo=FALSE}
-# First train the full random forest model
+library(caret)
 set.seed(621)
-final_rfmodel <- randomForest(
-  target ~ .,
+
+# Define cross-validation settings
+control <- trainControl(
+  method = "cv",
+  number = 5,
+  classProbs = TRUE,
+  summaryFunction = multiClassSummary
+)
+
+# Fit the Random Forest model with cross-validation
+final_rfmodel_reduced <- train(
+  target ~ age + urea + cr + hb_a1c + chol + tg + ldl + bmi + vldl,
   data = clean_dataset_of_diabetes_training,
+  method = "rf",
+  trControl = control,
   ntree = 500,
   importance = TRUE
 )
 
-# Then create the reduced version
-importance_df <- as.data.frame(importance(final_rfmodel))
-importance_df$Variable <- rownames(importance_df)
-selected_vars <- importance_df$Variable[importance_df$MeanDecreaseAccuracy > 10]
+# Print performance summary
+print(final_rfmodel_reduced)
 
-formula_reduced <- as.formula(paste("target ~", paste(selected_vars, collapse = " + ")))
-
-final_rfmodel_reduced <- randomForest(
-  formula_reduced,
-  data = clean_dataset_of_diabetes_training,
-  ntree = 500,
-  importance = TRUE
-)
-
-formula_reduced
-final_rfmodel_reduced
-
-# Variable Importance Plot
-varImpPlot(final_rfmodel_reduced, main = "Predictor Importance")
+# Optional: plot variable importance
+varImpPlot(final_rfmodel_reduced$finalModel, main = "Predictor Importance")
 ```
 
 **Overall Performance**
@@ -499,54 +497,39 @@ for (class in classes) {
 ### Model 3 - Random Forest - BEST OVERALL
 
 ```{r, echo=FALSE}
-# Predictions
-pred_class_reduced <- predict(final_rfmodel_reduced, dataset_of_diabetes_evaluation)
-pred_prob_reduced <- predict(final_rfmodel_reduced, dataset_of_diabetes_evaluation, type = "prob")
 
-# Confusion Matrix
-conf_matrix_reduced <- confusionMatrix(pred_class_reduced, dataset_of_diabetes_evaluation$target)
-print(conf_matrix_reduced)
-
-# Step 5: ROC Curves and AUC for reduced model
-par(mfrow = c(1, 3))
-for (class in levels(dataset_of_diabetes_evaluation$target)) {
-  roc_obj <- roc(
-    response = as.numeric(dataset_of_diabetes_evaluation$target == class),
-    predictor = pred_prob_reduced[, class]
-  )
-  plot(roc_obj, main = paste("Reduced ROC -", class))
-  auc_val <- auc(roc_obj)
-  legend("bottomright", legend = paste("AUC =", round(auc_val, 2)))
-}
-# Predict with reduced model
-prediction_prob_reduced <- predict(final_rfmodel_reduced, clean_dataset_of_diabetes_evaluation, type = "prob")
-prediction_class_reduced <- predict(final_rfmodel_reduced, clean_dataset_of_diabetes_evaluation, type = "class")
+# Predictions on clean evaluation data
+pred_class_reduced <- predict(final_rfmodel_reduced, newdata = clean_dataset_of_diabetes_evaluation)
+pred_prob_reduced  <- predict(final_rfmodel_reduced, newdata = clean_dataset_of_diabetes_evaluation, type = "prob")
 
 # Confusion Matrix
 conf_matrix_reduced <- confusionMatrix(
-  factor(prediction_class_reduced, levels = c("N", "P", "Y")),
+  factor(pred_class_reduced, levels = c("N", "P", "Y")),
   factor(clean_dataset_of_diabetes_evaluation$target, levels = c("N", "P", "Y"))
 )
 cat("\nConfusion Matrix - Reduced Model:\n")
 print(conf_matrix_reduced)
 
 # Accuracy
-accuracy_reduced <- mean(prediction_class_reduced == clean_dataset_of_diabetes_evaluation$target)
+accuracy_reduced <- mean(pred_class_reduced == clean_dataset_of_diabetes_evaluation$target)
 cat("Accuracy (Reduced Model):", accuracy_reduced, "\n")
 
 # ROC and AUC for each class (Reduced Model)
+classes_eval <- levels(clean_dataset_of_diabetes_evaluation$target)
+true_labels_eval <- clean_dataset_of_diabetes_evaluation$target
+
 par(mfrow = c(1, length(classes_eval)))  # one ROC per class
 for (class in classes_eval) {
-  binary_response_reduced <- ifelse(true_labels_eval == class, 1, 0)
-  pred_probs_reduced <- prediction_prob_reduced[, class]
+  binary_response <- ifelse(true_labels_eval == class, 1, 0)
+  pred_probs <- pred_prob_reduced[, class]
   
-  roc_curve_reduced <- roc(binary_response_reduced, pred_probs_reduced)
+  roc_curve <- roc(binary_response, pred_probs)
   
-  plot(roc_curve_reduced,
-       main = paste("ROC (Reduced) -", class, "\nAUC:", round(auc(roc_curve_reduced), 2)),
+  plot(roc_curve,
+       main = paste("ROC -", class, "\nAUC:", round(auc(roc_curve), 2)),
        col = "darkgreen", lwd = 2)
   
-   cat("AUC (Reduced) for", class, ":", auc(roc_curve_reduced), "\n")
+  cat("AUC for", class, ":", auc(roc_curve), "\n")
 }
 ```
 
@@ -557,7 +540,7 @@ for (class in classes_eval) {
 extract_metrics <- function(model, data, model_name, is_rf = FALSE) {
   if (is_rf) {
     pred_prob <- predict(model, data, type = "prob")
-    pred_class <- predict(model, data, type = "class")
+    pred_class <- predict(model, data, type = "raw")
   } else {
     pred_prob <- predict(model, data, type = "prob")
     pred_class <- predict(model, data, type = "class")
@@ -690,3 +673,82 @@ Models 1 and 2 may still hold value for:
 - **Class Imbalance Handling:** Superior management of rare "P" cases is achieved through techniques such as balanced sampling and ensemble voting.
 
 This analysis illustrates an optimal scenario wherein a well-tuned machine learning model substantially outperforms traditional statistical methodologies across all clinically relevant metrics, highlighting the potential for improved diagnostic accuracy and patient outcomes in diabetes management.
+
+Here’s your updated **Results** section with the evaluation table and language that reflects the real metrics **and** acknowledges the limitation of small, imbalanced data — all without using em dashes.
+
+
+### Results
+
+Three classification models were developed to predict diabetes status: two multinomial logistic regression models (Model 1 and Model 2) and a Random Forest model using a reduced feature set (Model 3). We evaluated each model using accuracy, kappa, sensitivity, specificity, and AUC across three classes: Normal (N), Pre-diabetic (P), and Diabetic (Y).
+
+Model 3 had the highest overall performance, achieving 99.5 percent accuracy on the evaluation set and perfect sensitivity and specificity for the P and Y classes. It also reached an AUC of 1.0 for all three classes. However, these results likely reflect limitations in the dataset. The evaluation set contained only 200 samples and showed significant class imbalance, which can lead to overly optimistic performance metrics. The model’s performance should therefore be interpreted with caution.
+
+Models 1 and 2 both had an accuracy of 93.0 percent, but struggled significantly with the Pre-diabetic class. Model 1 detected only 20 percent of P cases, while Model 2 failed to identify any. Both logistic regression models still performed well on the Diabetic class, achieving 98.8 percent sensitivity and AUCs of 0.974.
+
+To ensure consistency during data preparation, we cleaned the training and evaluation datasets separately, then recombined them (with the target variable hidden) for imputation. This allowed us to fill in missing values without introducing data leakage. For Model 3, feature reduction was applied to avoid multicollinearity.
+
+Below is the summary of evaluation metrics:
+
+```{r results='asis'}
+library(knitr)
+library(kableExtra)
+
+evaluation_results <- data.frame(
+  Model = c("Model 1 (Multinomial)", "Model 2 (Multinomial)", "Model 3 (Random Forest Reduced)"),
+  Accuracy = c(0.930, 0.930, 0.995),
+  Kappa = c(0.695, 0.704, 0.981),
+  Sensitivity_P = c(0.20, 0.00, 1.00),
+  Specificity_P = c(0.995, 0.995, 1.00),
+  Sensitivity_Y = c(0.988, 0.988, 1.00),
+  Specificity_Y = c(0.633, 0.700, 0.967),
+  AUC_Y = c(0.974, 0.974, 1.000)
+)
+
+kable(evaluation_results, digits = 3, caption = "Model Performance on Evaluation Data") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+This table shows that Model 3 excels across all metrics, but also highlights the sharp contrast in sensitivity for the Pre-diabetic class when compared to the logistic regression models. While Model 3 is the best performing model in this setup, further testing is needed to confirm its reliability in more realistic and balanced datasets.
+
+
+### Discussion
+
+The comparison of the three models reveals key differences in performance and practical applicability. Model 3, the Random Forest with reduced features, demonstrated superior predictive ability, achieving near-perfect metrics across all classes. It correctly identified all diabetic and pre-diabetic cases in the evaluation set, which is critical for early intervention and disease management.
+
+However, the model's perfect sensitivity, specificity, and AUC of 1.0 for each class are unlikely to generalize beyond this dataset. The evaluation set includes only 200 observations and is imbalanced, particularly with a low number of Pre-diabetic cases. This imbalance may have inflated the model's performance metrics. Additionally, the dataset's small size and lack of metadata limit the conclusions we can draw from these results.
+
+In contrast, the two multinomial logistic regression models, though more interpretable, performed poorly in detecting the Pre-diabetic class. Model 1 identified only 20 percent of these cases, and Model 2 failed to identify any. Both still showed high sensitivity for the Diabetic class and achieved respectable AUCs, but their inability to capture the intermediate class suggests a lack of complexity or flexibility in modeling non-linear relationships.
+
+Our workflow included important preprocessing decisions, such as cleaning and outlier removal prior to splitting, followed by combining datasets for imputation while masking the target. This approach avoided leakage and ensured consistent handling of missing values. Feature reduction in the Random Forest model also contributed to more stable performance by reducing redundancy.
+
+In summary, while the Random Forest model shows strong promise, its evaluation results are likely overly optimistic. Further testing on larger, more diverse datasets is necessary before considering real-world deployment.
+
+
+### Conclusion
+
+This project evaluated three predictive models for diabetes classification using a clinical dataset of 1,000 observations. The Random Forest model with a reduced set of features achieved the highest overall performance, correctly identifying all diabetic and pre-diabetic cases in the evaluation set with 99.5 percent accuracy and AUC scores of 1.0 for all classes. Its feature set included medically relevant indicators such as HbA1c, cholesterol, triglycerides, and BMI, supporting its clinical utility.
+
+Despite these promising results, the evaluation dataset was small and imbalanced, which likely inflated the performance metrics. The perfect scores suggest that the model may have overfit to the specific characteristics of the dataset. Therefore, the results should be viewed as exploratory rather than conclusive.
+
+The two multinomial logistic regression models offered more interpretability but underperformed in detecting at-risk (Pre-diabetic) individuals, limiting their usefulness for early screening.
+
+In conclusion, while the Random Forest model shows strong potential for accurate diabetes risk classification, further testing on larger, balanced datasets is needed to validate its performance and generalizability.
+
+
+### Future Work
+
+Several steps can improve and extend this project in future iterations:
+
+* **External Validation**: The model should be tested on independent datasets to evaluate its performance in different populations and clinical settings. This is essential to confirm generalizability beyond the current sample.
+
+* **Addressing Class Imbalance**: Future work should explore techniques like SMOTE, undersampling, or class-weighted algorithms to improve sensitivity for underrepresented classes, especially Pre-diabetic cases.
+
+* **Larger Datasets**: Working with a larger and more diverse dataset would help reduce overfitting and improve model robustness. The current dataset's size and limited metadata constrain the depth of analysis.
+
+* **Model Monitoring**: If deployed, the model should be monitored over time to detect data drift and maintain prediction quality. Regular retraining may be necessary to adjust for changes in clinical data.
+
+* **Interpretability Tools**: For clinical adoption, integrating explainability tools such as SHAP or LIME can help medical professionals understand how individual predictions are made.
+
+* **Fairness Analysis**: Future versions should evaluate how the model performs across different demographic groups such as age, gender, or socioeconomic status to ensure equitable outcomes.
+
+These steps will help move the model from a promising prototype to a reliable decision-support tool in real-world healthcare environments.
